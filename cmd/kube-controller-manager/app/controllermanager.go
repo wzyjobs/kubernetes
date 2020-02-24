@@ -109,12 +109,14 @@ controller, and serviceaccounts controller.`,
 			verflag.PrintAndExitIfRequested()
 			utilflag.PrintFlags(cmd.Flags())
 
+			//根据所有已知的controller和禁用的controller,配置KubeControllerManagerOptions
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
 
+			//运行KubeControllerManager
 			if err := Run(c.Complete(), wait.NeverStop); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
@@ -231,6 +233,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		}
 		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
+		//启动配置里所有的controller
 		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
@@ -268,6 +271,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Fatalf("error creating lock: %v", err)
 	}
 
+	//选主操作loop
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
@@ -343,6 +347,7 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
 
 // KnownControllers returns all known controllers's name
+//集群所有的controller的名字
 func KnownControllers() []string {
 	ret := sets.StringKeySet(NewControllerInitializers(IncludeCloudLoops))
 
@@ -507,6 +512,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 		ctx.Cloud.Initialize(ctx.ClientBuilder, ctx.Stop)
 	}
 
+	//依次启动所有controller
 	for controllerName, initFn := range controllers {
 		if !ctx.IsControllerEnabled(controllerName) {
 			klog.Warningf("%q is disabled", controllerName)

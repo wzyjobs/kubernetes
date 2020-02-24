@@ -199,11 +199,13 @@ func (le *LeaderElector) Run(ctx context.Context) {
 		runtime.HandleCrash()
 		le.config.Callbacks.OnStoppedLeading()
 	}()
+	//选主loop
 	if !le.acquire(ctx) {
 		return // ctx signalled done
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	//成为leader后的回调,异步
 	go le.config.Callbacks.OnStartedLeading(ctx)
 	le.renew(ctx)
 }
@@ -234,6 +236,7 @@ func (le *LeaderElector) IsLeader() bool {
 
 // acquire loops calling tryAcquireOrRenew and returns true immediately when tryAcquireOrRenew succeeds.
 // Returns false if ctx signals done.
+// 周期选举leader，直到自己成为leader后才推出循环
 func (le *LeaderElector) acquire(ctx context.Context) bool {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
