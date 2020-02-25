@@ -98,6 +98,7 @@ type DeploymentController struct {
 }
 
 // NewDeploymentController creates a new DeploymentController.
+//配置doployment的各个组件函数
 func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
@@ -118,6 +119,7 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 		Recorder:   dc.eventRecorder,
 	}
 
+	//为deploy添加CRUD处理器
 	dInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    dc.addDeployment,
 		UpdateFunc: dc.updateDeployment,
@@ -161,6 +163,7 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(dc.worker, time.Second, stopCh)
 	}
 
+	//停止信号量?
 	<-stopCh
 }
 
@@ -560,6 +563,7 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 
 // syncDeployment will sync the deployment with the given key.
 // This function is not meant to be invoked concurrently with the same key.
+//同步同key的deploy
 func (dc *DeploymentController) syncDeployment(key string) error {
 	startTime := time.Now()
 	klog.V(4).Infof("Started syncing deployment %q (%v)", key, startTime)

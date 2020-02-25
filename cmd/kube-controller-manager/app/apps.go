@@ -79,6 +79,7 @@ func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error
 	return nil, true, nil
 }
 
+//deploy控制器
 func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
 		return nil, false, nil
