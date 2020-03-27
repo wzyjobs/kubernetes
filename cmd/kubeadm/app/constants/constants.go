@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -266,9 +267,6 @@ const (
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
 	DefaultEtcdVersion = "3.4.3-0"
 
-	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.2"
-
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
 	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
@@ -337,7 +335,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.6.5"
+	CoreDNSVersion = "1.6.7"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -456,21 +454,45 @@ var (
 )
 
 // EtcdSupportedVersion returns officially supported version of etcd for a specific Kubernetes release
-// if passed version is not listed, the function returns nil and an error
-func EtcdSupportedVersion(versionString string) (*version.Version, error) {
+// If passed version is not in the given list, the function returns the nearest version with a warning
+func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString string) (etcdVersion *version.Version, warning, err error) {
 	kubernetesVersion, err := version.ParseSemantic(versionString)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	desiredVersion, etcdStringVersion := uint8(kubernetesVersion.Minor()), ""
+
+	min, max := ^uint8(0), uint8(0)
+	for k, v := range supportedEtcdVersion {
+		if desiredVersion == k {
+			etcdStringVersion = v
+			break
+		}
+		if k < min {
+			min = k
+		}
+		if k > max {
+			max = k
+		}
 	}
 
-	if etcdStringVersion, ok := SupportedEtcdVersion[uint8(kubernetesVersion.Minor())]; ok {
-		etcdVersion, err := version.ParseSemantic(etcdStringVersion)
-		if err != nil {
-			return nil, err
+	if len(etcdStringVersion) == 0 {
+		if desiredVersion < min {
+			etcdStringVersion = supportedEtcdVersion[min]
 		}
-		return etcdVersion, nil
+		if desiredVersion > max {
+			etcdStringVersion = supportedEtcdVersion[max]
+		}
+		warning = fmt.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
+			versionString, etcdStringVersion)
 	}
-	return nil, errors.Errorf("unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
+
+	etcdVersion, err = version.ParseSemantic(etcdStringVersion)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return etcdVersion, warning, nil
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present

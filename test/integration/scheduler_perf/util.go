@@ -61,8 +61,10 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 		Burst:         5000,
 	})
 	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet)
+	fakePVControllerShutdown := util.StartFakePVController(clientSet)
 
 	shutdownFunc := func() {
+		fakePVControllerShutdown()
 		schedulerShutdown()
 		apiShutdown()
 	}
@@ -241,9 +243,7 @@ func (tc *throughputCollector) collect() []DataItem {
 			sum += tc.schedulingThroughputs[i]
 		}
 
-		throughputSummary.Labels = map[string]string{
-			"Metric": "SchedulingThroughput",
-		}
+		throughputSummary.Labels["Metric"] = "SchedulingThroughput"
 		throughputSummary.Data = map[string]float64{
 			"Average": sum / float64(length),
 			"Perc50":  tc.schedulingThroughputs[int(math.Ceil(float64(length*50)/100))-1],
